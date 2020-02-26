@@ -41,7 +41,7 @@ def welcome():
         f"/api/v1.0/precipitation<br/>"
         f"/api/v1.0/stations<br/>"
         f"/api/v1.0/tobs<br/>"                
-        f"/api/v1.0/<start>/<end>"
+        f"/api/v1.0/start"
     )
 
 @app.route("/api/v1.0/precipitation")
@@ -91,6 +91,20 @@ def tobs():
     results = session.query(Measurement.date, func.round(func.sum(Measurement.prcp),2))\
         .filter(Measurement.date >= begin_date).filter(Measurement.date.between(begin_date, end_date))
 
+    session.close()
+
+    # Convert list of tuples into normal list
+    all_names = list(np.ravel(results))
+
+    return jsonify(all_names)
+
+@app.route("/api/v1.0/start")
+def start():
+    # Create our session (link) from Python to the DB
+    session = Session(engine)
+
+    results = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).\
+        filter(Measurement.date >= start_date).filter(Measurement.date <= end_date).all()
     session.close()
 
     # Convert list of tuples into normal list
