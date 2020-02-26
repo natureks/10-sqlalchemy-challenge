@@ -11,15 +11,17 @@ from flask import Flask, jsonify
 #################################################
 # Database Setup
 #################################################
-engine = create_engine("sqlite:///titanic.sqlite")
+engine = create_engine("sqlite:///Resources/hawaii.sqlite")
 
 # reflect an existing database into a new model
 Base = automap_base()
 # reflect the tables
 Base.prepare(engine, reflect=True)
+lst_class = Base.classes.keys()
 
 # Save reference to the table
-Passenger = Base.classes.passenger
+Measurement = Base.classes.measurement
+Station = Base.classes.station
 
 #################################################
 # Flask Setup
@@ -35,20 +37,40 @@ app = Flask(__name__)
 def welcome():
     """List all available api routes."""
     return (
-        f"Available Routes:<br/>"
-        f"/api/v1.0/names<br/>"
-        f"/api/v1.0/passengers"
+        f"Available API's:<br/>"
+        f"/api/v1.0/precipitation<br/>"
+        f"/api/v1.0/stations<br/>"
+        f"/api/v1.0/tobs<br/>"                
+        f"/api/v1.0/<start>/<end>"
     )
 
-
-@app.route("/api/v1.0/names")
-def names():
+@app.route("/api/v1.0/precipitation")
+def precipitation():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return a list of all passenger names"""
-    # Query all passengers
-    results = session.query(Passenger.name).all()
+    results = session.query(Measurement.date, Measurement.prcp).all()
+
+    dates_gb = [result[0] for result in results[:]]
+    precips_gb = [result[1] for result in results[:]]
+    res = {} 
+    for key in dates_gb: 
+        for value in precips_gb: 
+            res[key] = value 
+
+    session.close()
+
+    # Convert list of tuples into normal list
+    all_names = list(np.ravel(res))
+
+    return jsonify(all_names)
+
+@app.route("/api/v1.0/stations")
+def stations():
+    # Create our session (link) from Python to the DB
+    session = Session(engine)
+
+    results = session.query(Measurement.station).group_by(Measurement.station).all()
 
     session.close()
 
@@ -57,29 +79,24 @@ def names():
 
     return jsonify(all_names)
 
-
-@app.route("/api/v1.0/passengers")
-def passengers():
+@app.route("/api/v1.0/tobs")
+def tobs():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return a list of passenger data including the name, age, and sex of each passenger"""
-    # Query all passengers
-    results = session.query(Passenger.name, Passenger.age, Passenger.sex).all()
+    end_date = session.query(Measurement.date, Measurement.prcp)\
+        .filter(Measurement.date == func.max(Measurement.date).select()).first()[0]
+    begin_date = (dt.datetime.strptime(end_date, '%Y-%m-%d') - dt.timedelta(days=365)).strftime('%Y-%m-%d')
+
+    results = session.query(Measurement.date, func.round(func.sum(Measurement.prcp),2))\
+        .filter(Measurement.date >= begin_date).filter(Measurement.date.between(begin_date, end_date))
 
     session.close()
 
-    # Create a dictionary from the row data and append to a list of all_passengers
-    all_passengers = []
-    for name, age, sex in results:
-        passenger_dict = {}
-        passenger_dict["name"] = name
-        passenger_dict["age"] = age
-        passenger_dict["sex"] = sex
-        all_passengers.append(passenger_dict)
+    # Convert list of tuples into normal list
+    all_names = list(np.ravel(results))
 
-    return jsonify(all_passengers)
-
+    return jsonify(all_names)
 
 if __name__ == '__main__':
     app.run(debug=True)
