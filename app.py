@@ -89,7 +89,7 @@ def tobs():
     begin_date = (dt.datetime.strptime(end_date, '%Y-%m-%d') - dt.timedelta(days=365)).strftime('%Y-%m-%d')
 
     results = session.query(Measurement.date, func.round(func.sum(Measurement.prcp),2))\
-        .filter(Measurement.date >= begin_date).filter(Measurement.date.between(begin_date, end_date))
+        .filter(Measurement.date.between(begin_date, end_date))
 
     session.close()
 
