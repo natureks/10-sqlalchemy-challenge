@@ -1,12 +1,12 @@
 import numpy as np
 
-import sqlalchemy
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, func
 
 from flask import Flask, jsonify
-
+import datetime as dt
+import pandas as pd
 
 #################################################
 # Database Setup
@@ -88,23 +88,32 @@ def tobs():
         .filter(Measurement.date == func.max(Measurement.date).select()).first()[0]
     begin_date = (dt.datetime.strptime(end_date, '%Y-%m-%d') - dt.timedelta(days=365)).strftime('%Y-%m-%d')
 
+    print(f"Dates: {begin_date} {end_date}")
+    
+    session = Session(engine)
     results = session.query(Measurement.date, func.round(func.sum(Measurement.prcp),2))\
+        .group_by(Measurement.date)\
         .filter(Measurement.date.between(begin_date, end_date))
-
     session.close()
 
-    # Convert list of tuples into normal list
-    all_names = list(np.ravel(results))
+    df = pd.DataFrame(results, columns=["Date", "Percp"])
 
-    return jsonify(all_names)
+    return jsonify(df.values.tolist())
+
 
 @app.route("/api/v1.0/start")
 def start():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    results = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).\
-        filter(Measurement.date >= start_date).filter(Measurement.date <= end_date).all()
+    end_date = session.query(Measurement.date, Measurement.prcp)\
+        .filter(Measurement.date == func.max(Measurement.date).select()).first()[0]
+    start_date = (dt.datetime.strptime(end_date, '%Y-%m-%d') - dt.timedelta(days=365)).strftime('%Y-%m-%d')
+
+    results = session.query(func.min(Measurement.tobs),\
+                            func.round(func.avg(Measurement.tobs),2),\
+                            func.max(Measurement.tobs)).\
+                            filter(Measurement.date >= start_date).filter(Measurement.date <= end_date).all()
     session.close()
 
     # Convert list of tuples into normal list
@@ -113,4 +122,4 @@ def start():
     return jsonify(all_names)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
