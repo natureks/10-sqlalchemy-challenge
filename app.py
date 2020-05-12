@@ -100,9 +100,27 @@ def tobs():
 
     return jsonify(df.values.tolist())
 
+@app.route("/api/v1.0/<start_date>/<end_date>")
+def start(start_date, end_date):
+	''' 
+		http://127.0.0.1:5000/api/v1.0/2010-01-29/2010-02-09
+	'''
+	# Create our session (link) from Python to the DB
+	session = Session(engine)
 
-@app.route("/api/v1.0/start")
-def start():
+	results = session.query(func.min(Measurement.tobs),\
+							func.round(func.avg(Measurement.tobs),2),\
+							func.max(Measurement.tobs)).\
+							filter(Measurement.date >= start_date).filter(Measurement.date <= end_date).all()
+	session.close()
+
+	# Convert list of tuples into normal list
+	all_names = list(np.ravel(results))
+
+	return jsonify(all_names)
+
+@app.route("/api/v1.0/start_zz")
+def start_zz():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
